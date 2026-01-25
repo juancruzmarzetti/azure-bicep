@@ -1,4 +1,4 @@
-instalar azure cli con powershell para windows 64 bits:
+install azure cli with powershell for windows 64 bit:
 
 $ProgressPreference = 'SilentlyContinue'
 Invoke-WebRequest -Uri https://aka.ms/installazurecliwindowsx64 -OutFile .\AzureCLI.msi
