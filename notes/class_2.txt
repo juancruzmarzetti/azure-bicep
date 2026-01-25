@@ -1,0 +1,136 @@
+instalar azure cli con powershell para windows 64 bits:
+
+$ProgressPreference = 'SilentlyContinue'
+Invoke-WebRequest -Uri https://aka.ms/installazurecliwindowsx64 -OutFile .\AzureCLI.msi
+Start-Process msiexec.exe -Wait -ArgumentList '/I', 'AzureCLI.msi', '/quiet'
+Remove-Item .\AzureCLI.msi
+
+then we activate azure cli by closing the powershell terminal, opening it again and executing:
+
+az
+
+then, for login:
+
+az login
+
+(for login we need to have an active suscription in Microsoft Azure).
+
+we can check if we are logged or not using the next command:
+
+az show account
+
+
+about resources in bicep:
+
+(storageAccount resource)
+each resource have an resource type.(API version)(we use the latest version of this resource type)
+
+different resources have different rules of who you configure them.
+
+then the location property is the region. ej.:
+
+sku: this is how many replicas of our storage we need.ej: "Standard_LRS".
+
+kind: ej: StorageV2
+
+properties: so much more properties we can configure (depends on which service we are configuring)
+
+simbolic names and resource names are two different things:
+the first ones only appear within the bicep file, not inside azure. (documentation).
+resource names appear inside azure, they are impossible to change,
+and we need them to specfy which service we are configuring.
+
+to relationate a resource with another we need to specify outputs, those are variables that
+are specified in the end of the code of one bicep file of a resource, and that variable is
+which we would use in another resource configuration. This is neccesary if the resources may be relationated
+because this is the way that Azure Resource Manager (ARM) calculates in which order deploy the resources,
+understanding the dependencies between different resources or the independency of another resource to
+deploy it indenpendently from the other ones.
+
+for example, when we configure an appServiceApp we need to specify an appServicePlan id associated,
+so we previously need to configure an appServicePlan in a bicep file from which we can configure an output of its id
+to use it later in the other bicep file in which we configure the appServiceApp, or we can configure both in the same
+bicep file and refer the appServicePlan id using "appServicePlan.id"(implicit dependency).
+
+its not good to hardcode a location, we can use a variable and invoke it in the configuration.
+we define variables using "param", for example:
+
+DEPLOY WITH CLI (you can complement it using Azure Pipelines)
+if you want to deploy a bicep configuration, you have to send it to ARM, what you can do using Azure CLI...
+...for example you have a main.bicep file in which you configure a Storage Account resource:
+
+az group create -g Demo1 -l eastus3
+(this command line creates a resources group in a specific location, it´s needed to specify it to later deploy it)
+
+az deployment group create -g Demo1 -f main.bicep
+(this creates a resource group deployment, which goes into the resource group we created in the previous command line,
+and then we specify, with -f, the name and ubication of the bicep file we want to deploy)
+
+variables are different than parameters:
+variables are used for reusable values in the configuration. (specified in bicep file)
+parameters are used for a security approach: the values of the parameters usually are imported from outside the bicep configuration,
+and the parameters are not usually hardcoded in the bicep file like variables
+(although you can hardcode the value of the parameters in the bicep file).
+
+variables definition syntax:
+var appServicePlanName = "asdasdasd"
+
+parameters definition syntax:
+param appServicePlanName = "asdasdasd"
+
+expressions: you use them when you dont want to hard code this value or ask for it to specify it in a parameter.
+for example: resourceGroup().location
+using it like in the following example:
+
+param location string = resourceGroup().location
+
+other example: uniqueString(resourceGroup().id)
+
+(for that resources that need global unique names)
+param storageAccountName string = uniqueString(resourceGroup().id)
+
+
+String interpolation:
+This might be very useful in cases of some resources that do not allow numbers as principal characteres of the resource name.
+This practice also helps persons understand the infrastructure in more efficient way.
+
+Supporting non-production environments:
+- For prod environments: we use Standard_GRS SKU for high resiliency. App Service Plans will be deployed at the P2v3 SKU for high performance.
+- In non-productive environments: Standard_LRS SKU and App Service Plan deployed with free F1 SKU.
+
+the "@allowed" sentence (without a default value), makes that when we try to deploy this infraestructure from Azure CLI, Azure CLI asks which value we want 
+(one from the options), which we have to indicate with numbers,
+for example:
+
+[1] nonprod
+[2] prod
+
+- 1
+*enter*
+
+Starting nonprod deploying...   
+(This is not %100 real, just an example of how it works)
+
+Example of deploying it using Azure CLI:
+
+az deployment group create /
+ --name main /
+ --template-file main.bicep /
+ --parameters environmentType=nonprod
+
+All Bicep configurations can be reused modularizing them, making them more recyclable with parameters.
+
+Just like templates, bicep modules can define outputs.
+A good Bicep module follows a few key principles:
+- It should have a clear purpose. (A module should be a solution for a specific situation).
+- Don´t put every resource into its own module. (in general, it´s better for modules to combine multiple resources into them).
+- It should have clear parameters and outputs that make sense (considering the purpose of the module).
+- A module should ve as self contained as possible (the variables that the module uses should be included in the module file rather than in the parent template).
+- A module should not output secrets (Nor should templates).
+
+
+Important:
+When we implement a module from a bicep file, in which we asign values to the module params using another params with its values already asigned in the bicep file,
+we should also initialize this same params in the module (without asigning values this time).
+
+
