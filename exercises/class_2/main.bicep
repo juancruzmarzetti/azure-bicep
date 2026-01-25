@@ -2,7 +2,7 @@ param storageAccountName string = 'toylaunch${uniqueString(resourceGroup().id)}'
 param appServiceAppName string = 'toylaunch${uniqueString(resourceGroup().id)}'
 param location string = 'eastus'
 
-//Supporting non-productive envirionments:
+//Supporting non-productive environments:
 @allowed([
   'nonprod'
   'prod'
