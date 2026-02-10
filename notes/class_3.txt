@@ -1,0 +1,221 @@
+We would use KeyVault credentials for our different environment deployments.
+This is a good security practice, based on the goal of not leaking secrets 
+(in this case the credentials would give accessto anybody who haves them to our data).
+
+With parameters, you can provide information to a Bicep template
+at deployment time.
+The parameter name must be unique.
+"string" refers to the type of parameter.
+
+e.g.: param environmentName string
+
+we can add default values to our parameters in our templates:
+
+e.g.:
+param environmentName string = "dev"
+
+other datatypes of parameters:
+
+int: number
+bool: true or false
+object and array
+
+objects:
+
+e.g.:
+
+param appServicePlanSku object = {
+  name: "F1"
+  tier: "Free"
+  capacity: 1
+}
+
+arrays: list of items
+you can´t specify the datatype of the items that the array will contain.
+e.g.:
+
+param cosmosDBAccountLocations array = [
+  {
+    locationName: "australiaeast"
+  }
+  {
+    locationName: "southcentralus"
+  }
+  {
+    locationName: "westeurope"
+  }
+]
+
+resource account 'Microsoft.DocumentDB/databaseAccounts@2024-11-15' = {
+  name: accountName
+  location: location
+  properties: {
+    locations: cosmosDBAccountLocations
+  }
+}
+
+
+Decorators:
+these decorators provide a way to attach constraints and metadata
+to a parameter, which helps anyone using your templates 
+to understand what info they need to provide.
+
+examples:
+
+@allowed
+this decorator is useful when you need to make sure
+that a parameter has certain values.
+
+@allowed([
+  'P1v3'
+  'P2v3'
+  'P3v3'
+])
+param appServicePlanSkuName string
+
+the broadly use of this @allowed decorator may block valid deployments
+if we doesn´t keep allowed values lists up to date
+
+restrict parameter length adn values:
+
+@minLength(5)
+@maxLength(24)
+param storageAccountName string
+
+adding descrption to parameters:
+
+@description('The locations into which this Cosmos DB account should be configured. This parameter needs to be a list of objects, each of which has a locationName property.')
+param cosmosDBAccountLocations array
+
+---
+
+parameter files:
+these parameter files make it easy to specify parameter values
+together as a set.
+
+-$schema helps ARM to understand that this file is a param file.
+-contentVersion is a property for keeping track of changes in the param file
+usually set to its default value.
+-the params section lists each param and the associated value for each one.
+the value must be specified as an object. The object has a property
+called value that defines the actual param value to use.
+
+the file can be named parameters.json or parameters.dev.json...
+
+its a JSON file.
+
+we could run our bicep template using a param file via Azure CLI
+like the following:
+
+az deployment group create /
+ --name main /
+ --template-file main.bicep /
+ --parameters main.parameters.json
+
+we can also specify param values at the Azure CLI.
+
+we can also specify param values via a json file and override some
+param values using Azure CLI:
+
+az deployment group create /
+ --name main /
+ --template-file main.bicep /
+ --parameters main.parameters.json /
+ appServicePlanInstanceCount=5
+
+to define secure parameters:
+
+@secure()
+param sqlServerAdministratorLogin string
+
+@secure()
+param sqlServerAdministratorPassword string
+
+IMPORTANT: don´t create outputs that may include sensitive data.
+ALSO IMPORTANT: avoid using param files for secrets.
+
+Azure Key Vault is a service designed to store and provide access to secrets.
+
+you can refer to secrets in key vaults that are located
+in a different resource group or subscription from the one you are deploying to.
+
+access key vault for module parameters:
+example:
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
+  name: keyVaultName
+}
+
+module applicationModule 'application.bicep' = {
+  name: 'application-module'
+  params: {
+    apiKey: keyVault.getSecret('ApiKey')
+  }
+}
+
+for doing some practices we would need to already have a keyvault
+created on ARM before running the bicep template deployment, so we
+may need to create it from the portal or from Azure CLI...
+
+Azure CLI Key Vault creation (and a little config) example:
+
+az keyvault create /
+  --name &keyVaultName /
+  --location westus /
+  --enabled-for-template-deployment true
+
+(the "keyVaultName" its a variable initialized with the value of the key 
+vault name).
+
+then we can set the secrets like the following:
+
+az keyvault secret set
+ --vault-name $keyVaultName
+ --name "sqlServerAdministratorLogin"
+ --value $login 
+ --output none
+
+az keyvault secret set
+ --vault-name $keyVaultName
+ --name "sqlServerAdministratorPassword"
+ --value $password
+ --output none
+
+then we also need to obtain the key vault resource id,
+for that we gonna run the following...
+
+az keyvault show --name $keyVaultName --query id --output tsv
+
+the output gonna look like this:
+/subscriptions/aaaa0a0a-bb1b-cc2c-dd3d-eeeeee4e4e4e/resourceGroups/PlatformResources/providers/Microsoft.KeyVault/vaults/toysecrets
+
+then, using this key vault resource id, we can reference this secret values
+and initialize this params as objects
+and also as values of the "parameters" key of the json params file.
+Using the param file:
+
+    "sqlServerAdministratorLogin": {
+      "reference": {
+        "keyVault": {
+          "id": "YOUR-KEY-VAULT-RESOURCE-ID"
+        },
+        "secretName": "sqlServerAdministratorLogin"
+      }
+    },
+    "sqlServerAdministratorPassword": {
+      "reference": {
+        "keyVault": {
+          "id": "YOUR-KEY-VAULT-RESOURCE-ID"
+        },
+        "secretName": "sqlServerAdministratorPassword"
+      }
+    }
+
+then we can deploy our bicep template implementing secret param values
+with Azure CLI:
+
+az deployment group create \
+  --name main \
+  --template-file main.bicep \
+  --parameters main.parameters.dev.json
+
