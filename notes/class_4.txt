@@ -1,0 +1,90 @@
+conditions and loops can help make your Azure deployments more flexible.
+
+in this class we will extend a bicep template by using conditions and loops:
+- use conditions to depoy resources only when required.
+- use loops to deploy multiple instances of azure resources.
+- control loop parallelism.
+- create nested loops.
+- combine loops with variables and outputs.
+
+deploy resources conditionally: using conditions in the bicep code to deploy resources only when specific constraints are in place.
+
+we can use the if keyword followed by a condition, for example:
+
+param deployStorageAccount bool
+
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = if (deployStorageAccount) {
+  name: 'teddybearstorage'
+  location: resourceGroup().location
+  kind: 'StorageV2'
+  // ...
+}
+
+a more general example:
+
+resource asd "Microsoft.Storage..." = if (condition) {
+
+}
+
+other type of condition example:
+
+
+@allowed([
+  'Development'
+  'Production'
+])
+param environmentName string
+
+resource auditingSettings 'Microsoft.Sql/servers/auditingSettings@2024-05-01-preview' = if (environmentName == 'Production') {
+  parent: server
+  name: 'default'
+  properties: {
+  }
+}
+
+
+depend on conditionally deployed resources: how bicep evaluates the dependecies between the resources?
+a resource depends on other resource when we reference on one resource some data from other resource, and the deployment could fail if a resource depends on other resource that is defined using conditions.
+In that case, in the second resource which depends on the conditionally defined one, in the part where we are referencing the data from the other resource, we should also make this reference conditional:
+example:
+
+resource auditingSettings 'Microsoft.Sql/servers/auditingSettings@2024-05-01-preview' = if (auditingEnabled) {
+  parent: server
+  name: 'default'
+  properties: {
+    state: 'Enabled'
+    storageEndpoint: environmentName == 'Production' ? auditStorageAccount.properties.primaryEndpoints.blob : ''
+    storageAccountAccessKey: environmentName == 'Production' ? listKeys(auditStorageAccount.id, auditStorageAccount.apiVersion).keys[0].value : ''
+  }
+}
+
+---
+
+deploy multiple resources by using loops: often, you need to deploy multiple resources that are very similar.
+
+use copy loops. when you define a resource or a module in a bicep template you can use the for keyword to create a loop.
+for example: we want to create 3 storage accounts with the same properties but with different names, so:
+
+param storageAccountNames array = [
+  'saauditus'
+  'saauditeurope'
+  'saauditapac'
+]
+
+resource storageAccountResources 'Microsoft.Storage/storageAccounts@2023-05-01' = [for storageAccountName in storageAccountNames: {
+  name: storageAccountName
+  location: resourceGroup().location
+  kind: 'StorageV2'
+  sku: {
+    name: 'Standard_LRS'
+  }
+}]
+
+
+loop based on a count: its good to use this kind of loop when you need to create a specific number of resources, and not use an array as the source.
+when you use the range() function, you provide two arguemnts: 
+- the first specifies the starting value
+- the second tells bixep the number of values you want.
+for example: if you use range(3,4) then bicep will return the values 3, 4, 5 and 6.
+
+--- pause at min 37 of the class ---
