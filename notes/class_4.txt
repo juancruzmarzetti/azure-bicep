@@ -107,4 +107,206 @@ module databases 'modules/database.bicep' = [for location in locations: {
 
 you can also reference every item of an array with its associated index, like "locations[0]" value would be "westus"
 
---- pause at min 42 ---
+using a specific syntax you can use the value of an array property and simultaneously reference its associated array index:
+
+resource sqlServers 'Microsoft.Sql/servers@2024-05-01-preview' = [for (location, i) in locations: {
+  name: 'sqlserver-${i+1}'
+  location: location
+  properties: {
+    administratorLogin: administratorLogin
+    administratorLoginPassword: administratorLoginPassword
+  }
+}]
+
+
+we also could want to, in a bucle, filter the array to use some properties or objects of the array instead of others...
+
+param sqlServerDetails array = [
+  {
+    name: 'sqlserver-we'
+    location: 'westeurope'
+    environmentName: 'Production'
+  }
+  {
+    name: 'sqlserver-eus2'
+    location: 'eastus2'
+    environmentName: 'Development'
+  }
+  {
+    name: 'sqlserver-eas'
+    location: 'eastasia'
+    environmentName: 'Production'
+  }
+]
+
+resource sqlServers 'Microsoft.Sql/servers@2024-05-01-preview' = [for sqlServer in sqlServerDetails: if (sqlServer.environmentName == 'Production') {
+  name: sqlServer.name
+  location: sqlServer.location
+  properties: {
+    administratorLogin: administratorLogin
+    administratorLoginPassword: administratorLoginPassword
+  }
+  tags: {
+    environment: sqlServer.environmentName
+  }
+}] 
+
+for the deploy we should run the following on Azure CLI:
+
+az deployment group create --name main --template-file main.bicep
+
+
+Control loop execution using @batchSize:
+when we deploy multiple resources, by default, ARM deploys most of them simultaneously. But in some cases we should want to deploy them in a controlled sequence, and organize its deployments.
+
+for example:
+
+@batchSize(2)
+resource appServiceApp 'Microsoft.Web/sites@2024-04-01' = [for i in range(1,3): {
+  name: 'app${i}'
+  // ...
+}]
+
+there, "app1" and "app2" will be deployed in the first batch, and when that deployment ends, the "app3" will start to be deployed in the second batch.
+in general, this is used in some specific resources.
+
+other example:
+
+@batchSize(1)
+resource appServiceApp 'Microsoft.Web/sites@2024-04-01' = [for i in range(1,3): {
+  name: 'app${i}'
+  // ...
+}]
+
+then, you can use lopps to help set resource properties:
+
+for example, you can use array indexes for subnets address prefixes:
+
+param subnetNames array = [
+  'api'
+  'worker'
+]
+
+resource virtualNetwork 'Microsoft.Network/virtualNetworks@2024-05-01' = {
+  name: 'teddybear'
+  location: resourceGroup().location
+  properties: {
+    addressSpace: {
+      addressPrefixes: [
+        '10.0.0.0/16'
+      ]
+    }
+    subnets: [for (subnetName, i) in subnetNames: {
+      name: subnetName
+      properties: {
+        addressPrefix: '10.0.${i}.0/24'
+      }
+    }]
+  }
+}
+
+Nested loops:
+some scenarios need you to use a loop inside another lopp: a nested loop...
+
+example:
+
+resource virtualNetworks 'Microsoft.Network/virtualNetworks@2024-05-01' = [for (location, i) in locations : {
+  name: 'vnet-${location}'
+  location: location
+  properties: {
+    addressSpace:{
+      addressPrefixes:[
+        '10.${i}.0.0/16'
+      ]
+    }
+    subnets: [for j in range(1, subnetCount): {
+      name: 'subnet-${j}'
+      properties: {
+        addressPrefix: '10.${i}.${j}.0/24'
+      }
+    }]
+  }
+}]
+
+this would create 3 virtual networks, each one with its associated location, a address prefix and two subnets.
+
+Variable and output loops:
+
+variable loops: by using them you can create an array, which you can then use through your bicep file.
+for example:
+
+var items = [for i in range(1, 5): 'item${i}']
+
+other example:
+
+param addressPrefix string = '10.10.0.0/16'
+param subnets array = [
+  {
+    name: 'frontend'
+    ipAddressRange: '10.10.0.0/24'
+  }
+  {
+    name: 'backend'
+    ipAddressRange: '10.10.1.0/24'
+  }
+]
+
+var subnetsProperty = [for subnet in subnets: {
+  name: subnet.name
+  properties: {
+    addressPrefix: subnet.ipAddressRange
+  }
+}]
+
+resource virtualNetwork 'Microsoft.Network/virtualNetworks@2024-05-01' = {
+  name: 'teddybear'
+  location: resourceGroup().location
+  properties:{
+    addressSpace:{
+      addressPrefixes:[
+        addressPrefix
+      ]
+    }
+    subnets: subnetsProperty
+  }
+}
+
+using loops for declaring output variables: 
+
+for example:
+
+var items = [
+  'item1'
+  'item2'
+  'item3'
+  'item4'
+  'item5'
+]
+
+output outputItems array = [for i in range(0, length(items)): items[i]]
+
+other example:
+
+param locations array = [
+  'westeurope'
+  'eastus2'
+  'eastasia'
+]
+
+resource storageAccounts 'Microsoft.Storage/storageAccounts@2023-05-01' = [for location in locations: {
+  name: 'toy${uniqueString(resourceGroup().id, location)}'
+  location: location
+  kind: 'StorageV2'
+  sku: {
+    name: 'Standard_LRS'
+  }
+}]
+
+output storageEndpoints array = [for i in range(0, length(locations)): {
+  name: storageAccounts[i].name
+  location: storageAccounts[i].location
+  blobEndpoint: storageAccounts[i].properties.primaryEndpoints.blob
+  fileEndpoint: storageAccounts[i].properties.primaryEndpoints.file
+}]
+
+
