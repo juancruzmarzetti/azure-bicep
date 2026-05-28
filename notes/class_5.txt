@@ -1,0 +1,43 @@
+-------- Create composable Bicep files by using modules. ---------
+
+Bicep modules are very useful in big projects.
+
+Benefits of modularizing Bicep:
+
+- Reusability: After you've created a module, you can reuse it in multiple Bicep files, even if the files are for different projects or workload.
+- Encapsulation: Modules help you keep related resource definitions together.
+- Composability: It's helpful to think of Bicep modules as building blocks that can be combined in different ways to support your deployments.
+- Functionality: Ocassionally, you might need to use modules to access certain functionality (that you can't access without the use of modules).
+
+
+---- Nest modules: modules can include other modules (it's not recommended to make more than two levels of nesting)
+For complex deployments, sometimes it makes sense to use deployment pipelines to deply multiple templates instead of creating a single template
+that does everything with nesting.
+
+
+Use the module in a Bicep template:
+- the module kyword.
+- a symbolic name. This name is used within this Bicep file whenever you want to refer to the module. The symbolic name appears in Azure.
+- the module path. This is typically the path to a bicep file on your  local file system (you can also share modules by using registries and template specs).
+- the name property, which specifies the name of the deployment.
+- the params property, where you can specify values for the parameters that the module expects.
+
+Module parmeters:  think about the parameters that your module accepts, and wether each parameter should be optional or required.
+
+Use conditions: One of the goals with deploying an infrastructure by using code like Bicep is to avoid duplicating effort, or even
+creating several templates for the same or very similar purposes.
+
+Module outputs: modules can define outputs.
+Warning about module aoutputs: don't use outputs for secret values. Outputs are logged as part of the deployment history, so they're not appropiate
+for secure values.
+Use an output to provide the resource's name. Then the parent can create an existing resource with that name and can look up the secure value dynamically.
+Write the value to an Azure Key Vault secret. Have the parent template read the secret fromt the vault when it needs it.
+
+Conditions are a bit diferent when in using it in modules.
+For example, inside a module you can define the value of a param as an empty string, and then inside the module configure a resource based on the logic
+of if the param's value is an empty string or not (so when you call the module, you can define a certain value for that param or not, and that would have
+different results on the infrastructure).
+
+You also can chain modules using an output from uno module as a value of a param of another one (it's important to don't implement this if
+it's not necessary).
+
