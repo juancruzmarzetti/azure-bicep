@@ -1,0 +1,143 @@
+------------------- Deploy child and extension resources by using Bicep -------------------
+
+Azure deployments are comprised of one or more piece of functionality, such as virtual machines, virtual networks, and database services.
+
+- Azure resources: individual pieces of cloud funcctionality.
+- Child resources: hierarchal configuration of related resource types.
+- Extension resources: common extensibility across many resource types
+- Existing resources: not a type, but a important to examine.
+
+For example, if I want to lock a virtual machine (because i wan't that virtual machine to be indeletable) a lock is an extension resource.
+
+The hierarchy of resources happen because of its dependecy between them, for example:
+if you want to have a Azure Cosmos DB, you have to have an Azure Cosmos DB Account.
+if you want to have a Azure DB container, you have to have a Azure database (which also depends on the need of having an Azure Database Account).
+if you want to have a Log Analytics workspace in your Azure storage account, you will also need to have a child resource, in this case Log analytics workspace, which have to be associated
+with the Diagnostic settings on that storage account.
+
+Using child, extension and existing resources are a foundational skill in crafting complete Azure deployments.
+
+- Related resource types are grouped into Resource Prividers (API).
+- Each resource has a specific type Type and Version.
+- Resources are referred to or identified with Resource ID.
+This is very important, it's a very good practice to be updated with the latest versions and latest changes on APIs when crafting our Bicep templates.
+Although, you can use old versions or APIs that have been kowking for you before (if you don't want to take advantage of the improvements on newest API versions).
+Depending on how you declare that child resource it can inherit the API version from the parent or it can be completely separated.
+
+Resource types are logically grouped into resource providers, which map to an Azure API. For example, a few common recource providers are the following:
+- Microsoft.Compute --> Virtual Machines, Availability Sets
+- Microsoft.Network --> Virtual Networks, Load Balancer, IP Address
+- Microsoft.Web     --> Server farms, sites
+
+Whe can think the providers as logical groupings of resource types.
+ 
+The resource provider names and resource type names occasionally don´t match the names of the Azure services they are for, or they might be old product or resource names.
+For example, the resource provider for Log Analytics workspaces is Microsoft.OperationalInsights.
+
+Resource Types: a resource provider exposes multiple types of resources, for example the Web provider exposes:
+- Server Farm --> the infrastructure that runs a web application (size, protocol, and authentication).
+- Sites --> the application that runs in the farm.
+- Certificates --> certificates used by web applications.
+
+Resource IDs:
+Individual instances of a resource are identified by a Resource ID. Each Resource ID includes reference to the suscription, resource group, provider and resource type.
+Example: /suscriptions/<ID>/resourceGroups/<resourceGroup>/providers/<resourceProvider>/<resourceType>/<resourceName>
+
+There ir a visual studio code extension that, if you go to the Azure Portal and copy the Resource ID of an exsiting resource, and paste it using this extension, this extension will
+craft the bicep code of this existing resource for you.
+
+Define child resources:
+It makes sense to deply some resources only within the context of their parent.
+
+Examples:
+- Virtual network subnets     --> Microsoft.Network/virtualNetworks/subnets
+- App Service configuration   --> Microsoft.Web/sites/config
+- SQL databases               --> Microsoft.Sql/servers/databases
+- Virtual Machines extensions --> Microsoft.Compute/virtualMachines/extensions
+- Storage blob containers     --> Microsoft.Storage/storageAccounts/blobServices/containers
+- Azure Cosmos DB containers  --> Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers
+
+
+Nested resources:
+One approach to defining a child resource is to nest the child resource inside the parent.
+
+Example on bicep template:
+
+resource vm 'Microsoft.Compute/virtualMachines@2020-06-01' = {
+	name: vmName
+	location: location
+	properties: {
+		// virtual machine properties here
+	}
+	
+	// nesting a child resource of the virtual machine here. 
+	// (this is not a extension resource, the 'extensions' in the following line referrs to the Type 'extensions' who belongs to the Microsoft.Compute provider)
+	resource installCustomScriptExtension 'extensions' = {
+		name: 'InstallCustomScript'
+		location: location
+		properties: {
+			// properties of the nested child resource here
+		}
+	}
+}
+
+(this is the simplest way to decalre child resources, but if you have to declare more than 2 or 3 child resources 
+the nesting approach is not recommendended, because it would make the bicep template hard to read).
+
+A different approach to declare child resource is by using the parent property:
+Declare the child resource without any nesting and then tell Bicep about the parent-child relationship by using this parent property:
+
+Example:
+
+resource vm 'Microsoft.Compute/virtualMachines@2020-06-01' = {
+        name: vmName
+        location: location
+        properties: {
+                // virtual machine properties here
+        }
+}
+
+// Using this approach we need to specify the specific API version associated and not only the type 'extensions'.
+resource installCustomScriptExtension 'Microsoft.Compute/virtualMachines/extensions@2020-06-01' = {
+	// parent property 
+	parent: vm
+        name: 'InstallCustomScript'
+        location: location
+        properties: {
+               // properties of the nested child resource here
+        }
+}
+
+
+Although, there are some circumstances where you can't use nested resource or the parent keyword, and in that cases you will need to
+construct the resource name:
+
+Example:
+
+resource vm 'Microsoft.Compute/virtualMachines@2020-06-01' = {
+        name: vmName
+        location: location
+        properties: {
+                // virtual machine properties here
+        }
+}
+
+// In this case (similiar as in the parent property approach), we need to specify the specific API version associated and not only the type 'extensions'.
+resource installCustomScriptExtension 'Microsoft.Compute/virtualMachines/extensions@2020-06-01' = {
+        // construction of the child resource name
+        name: '${vm.name}/InstallCustomScript'
+        location: location
+        properties: {
+               // properties of the nested child resource here
+        }
+}
+
+With this approach, ARM, when reading the name of the installCustomScriptExtension, understands that it is child resource of the Virtual Machine resource.
+(avoid this method to maximaze the benefits of using Azure Bicep, only use it when the previous approaches can't be used).
+
+
+Child resource IDs:
+You start creating a child resource ID by using including its parent's resource ID and then appending the child type and name.
+
+---- pause at min 48 of class's video ----
+
