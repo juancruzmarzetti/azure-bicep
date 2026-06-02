@@ -1,0 +1,88 @@
+------------ Structure your Bicep code for collaboration ------------
+
+One of the benefits of deploying your infrastructure as code is that your templates are shareable, allowing you to colaborate on your Bicep code with other team members.
+
+It's important to be able to author Bicep templates that are clear, reusable, and well documented.
+
+Some additional information here: https://github.com/Ba4bes/Bicep-NamingConvention/tree/main
+
+
+Improve parameters and names:
+Parameters are the most common way that your colleagues will interact with your template.
+When they deploy your template, they need to specify values for the parameters.
+
+How understandable are the parameters?
+Parameters hel make Bicep files reusable and flexible. It's important that the purpose of each parameter is clear to anyone who uses it.
+- Default values simplify the process of deploying your template. If your parameters have good default values that workfor most of your template's users, the users
+can omit the parameter values instead of specifying them every time they deploy the template.
+- Default values provide an example of how you expect the parameter value to look. If template users need to choose a different value, the default value can provide
+useful hints about what their value shoul look like.
+
+Bcicep can also help to validate the input that users provide through parameter decorators.
+- Descriptions
+- Value constraints (decorators) --> @allowed(), @minValue(), maxValue(), minLength(), maxLength(), etc.
+- Metadata
+
+IMPORTANT: be carefurl when you use the @allowed() parameter decorator to specify SKUs. Azure services often add new SKUs, and you don't want your template to unnecesarily prohibit their use.
+Consider using Azure Policy to enforce the use of specific SKUs, and use the @allowed() decorator with SKUs only when there are functional reasons why your template's users shouldn't select
+a specific SKU. For example, the features that your template needs might not be available in that SKU. Explain this by using a @description() decorator or comment that makes the reasons
+clear to anyone in future.
+
+Flexibility: provide free-form configuration options. Use predefined configuration sets.
+
+Provide free-form configuration options:
+For example, both the App Service plan and the storage account require that you specify their SKUs.
+
+Think about the people who will work with your template. Seeing dozens of parameters might overwhelm them and cause them to abandon using your template.
+
+You might be able to reduce the number of parameters by grouping related parameters in the form of a parameter object, like in the following example:
+
+param appServicePlanSku object = {
+	name: 'S1'
+	capacity: 2
+}
+
+However, this approach can reduce your ability to validate the parameter values,, and it's not always easy for your template users to understand how to define the object.
+
+Use predefined configuration sets:
+Alternatively, you could provide a configuration set: a single parameter, whose value is a restricted list of allowed values, such as a list of environment types.
+Example below:
+
+@allowed([
+	'Production'
+	'Test'
+])
+param environmentType string = 'Test'
+
+var environmentConfigurationMap = {
+	Production: {
+		appServicePlan: {
+			sku: {
+				name: 'P2V3'
+				capacity: 3
+			}
+		}
+	}
+	Test: {
+		// ...
+	}
+}
+
+The predefined configuration sets approach is sometimes called t-shirt sizing. When you buy a t-shirt, you simply choose from small, medium and large sizes, and the
+designer has predefined those measurements based on that size.
+
+
+In Bicep it's important to give your resources meaningful names:
+- Symbolic names: are used only within the Bicep file and don't appear on your Azure resources. Symolic names help users who read or modify your template to understand
+the purpose of a parameter, variable, or resource definition, and they help users make informed decisions about whether to change the template.
+- Resource names: are the names of the resources that are created in Azure. Many resources have constraints on their names, and many require their names to be unique.
+
+Every resource has a name. Names make up a part of the resource's identifier. In many cases, they also are represented as the hostnames that you use to access the resource.
+- Add a parameter that's used to create a uniqueness suffix. This helps to ensure that your resources have unqiue names. It's a good idea to use the uniqueString() function
+to generate a default value. Be sure to use the @maxLength() decorator to limit the length of this suffix so that your resource names won't exceed their maximum lengths.
+- Use variables to construct resource names dynamically. Your Bicep code can ensure that the names it generates follow your organization's naming convention as well as Azure requirements.
+Include the uniqueness suffix as part of the resource name.
+
+------- min 43 --------
+
+
