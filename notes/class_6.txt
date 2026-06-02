@@ -139,5 +139,70 @@ With this approach, ARM, when reading the name of the installCustomScriptExtensi
 Child resource IDs:
 You start creating a child resource ID by using including its parent's resource ID and then appending the child type and name.
 
----- pause at min 48 of class's video ----
+
+----- Extension resources -----
+
+Extension resources extend functionality and are always attached to other Azure resources.
+They are attached to other resources using the scope property. (it's visually similar, in bicep templates, to the use of the parent property for delcaring children relationships, but 'scope'
+declares that the resource who whas this property is an extension of the resource who is pointed as value of the 'scope' property).
+
+Example working with existing resources:
+
+Bicep files often need to refer to resources that have benn created elsewhere.
+- You're adding a SQL databse into an Azure SQL logical server instance that someone has already created.
+- You're configuring diagnostics settings for resources that are defined in another Bicep module.
+- You have to securely access the keys for a storage account that has been manually deployed into your subscription.
+
+Refer to child resources: using the symbolic name, just as you do with other resources.
+The following example uses the nested resource accessor '::' to return the ID of the existing subnet:
+
+resource vnet 'Microsoft.Network/virtualNetwork@2020-11-01' existing = {
+	name: 'toy-design-vnet'
+	
+	resource managementSubnet 'subnets' existing = {
+		name: 'management'
+	}
+}
+
+output managementSubnetResourceId string = vnet::managementSubnet.id
+
+
+Refer to resources outside the resource group:
+
+Often you'll need to refer to resources in a different resource group and/or sobscription. Do so using the scope keyword.
+Example below:
+
+'networking-rg' referrs to the name of the resource group in which the 'toy-design-vnet' is currently existing. --> (Example 1).
+We can also refer to resources on different subscriptions by giving the value 'resourceGroup(<suscriptionId>,<resourceGroupName>)' to the scope property. --> (Example 2).
+
+Example 1:
+resource vnet 'Microsoft.Network/virtualNetwork@2020-11-01' existing = {
+	scope: resourceGroup('networking-rg')
+	name: 'toy-design-vnet'
+}
+
+Example 2:
+resource vnet 'Microsoft.Network/virtualNetwork@2020-11-01' existing = {
+        scope: resourceGroup('asdaasd9-a8s7da0d9a-8dayd76s87-d6a8sd7','networking-rg')
+        name: 'toy-design-vnet'
+}
+
+
+Add child and extension resources to an existing resource:
+You can add a child resource to an already-created parent resource by using a combination of the existing keyword and the parent keyword.
+
+Example of adding an extension resource to an existing resource suing the scope property approach:
+ 
+resource storageAccount 'Microsoft.Storage/storageAccounts@2019-06-01' existing = {
+	name: 'toydesigndocs'
+}
+
+resource lockResource 'Microsoft.Authorization/locks@2016-09-01' = {
+	scope: storageAccount
+	name: 'DontDelete'
+	properties: {
+		level: 'CanNotDelete'
+		notes: 'Prevents deletion of the toy design documents storage account'
+	}
+}
 
