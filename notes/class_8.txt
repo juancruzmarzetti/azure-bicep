@@ -83,6 +83,84 @@ to generate a default value. Be sure to use the @maxLength() decorator to limit 
 - Use variables to construct resource names dynamically. Your Bicep code can ensure that the names it generates follow your organization's naming convention as well as Azure requirements.
 Include the uniqueness suffix as part of the resource name.
 
-------- min 43 --------
+IMPORTANT: it's better to use uniqueness suffixes rather than prefixes. This approach makes it easier to srt and to quickly scan your resource names.
+Also, some Azure resources have restrictions about the first character of the name, and randomly generated names can sometimes violate these restrictions.
+Although, not every resource requires a globally unique name. 
+
+
+Order in Bicep template files:
+It's important to consider the order of your elements to ensure that your template is clear and understandable:
+- Group elements by element type: (params, vars, resources and outputs, in that order). --> If you follow this order approach, consider putting the target scope at the top of the file.
+- group elements by resource: alternatively you can group your elements based on the type of resources that are being deployed. 
+(gral. params, storageAccount params and vars, staorageAccount resource declaration and outputs, adn then all the params, vars, resource declaration and outputs of another resource
+and this order consecutively...). (It's a better practice to create modules for groups of related resources, and then use a simnpler template to combine the modules).
+
+White spaces help create structure: blank lines, or white spaces, can help you add visual structure to your template. By using white space thoughtfully, you can
+group the sections of your Bicep code logically, which can in turn help clarify the relationships between resources. Consider adding a blank line between major sections.
+
+
+How do you define several simir resources?
+
+With Bicep, you can use loops to deploy similar resources from a single definition. Look for places where you define multiple resources that are identical, or that have few differences in their properties.
+Then, add a variable to list the resources to create, along with the properties that differ from the other resources.
+Example:
+
+resource cosmosDBContainers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2020-04-01' = [for cosmosDBContainerDefinition in cosmosDBContainerDefinitions: {
+	parent: cosmosDBDatabse
+	name: cosmosDBContainerDefinition.name
+	properties: {
+		resource: {
+			id: cosmosDBContainerDefinition.name
+			// ...
+		}
+		// ...
+	}
+	// ...
+}]
+
+
+How do you deploy resources only to certain environments?
+
+By using the if keyword, you can selectively deploy resources based on a parameter value, a configuration map variable, or another condition.
+Example:
+
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2020-03-01-preview' = if (environmentConfigurationMap[environmentType].enableLogging) {
+	name: logAnalyticsWorkspaceName
+	location: location
+}
+
+
+Dependencies:
+ARM and Bicep have the concept of child resources, which makes sense only when they're deployed within the context of their parent. For example, an Azure SQL database is a child
+of a SQL server instance. There are several ways to define child resources, but in most cases, it's a good diea to use the parent property.
+
+Hard-coding property values: this would be a good practice only when you know the values won't change.
+
+
+Document your code by adding comments and metadata:
+Good Bicep code is self-documenting (clean-naming and good structure). 
+In some situations, though, you might need to clarify certain code by adding extra documentation to your Bicep files.
+
+You can use comments with a similar syntax as in JavaScript:
+- Single-line comments: using '//'
+- Multi-line comments: using '/*' to open the first-line space of the comment and then add '*/' at ending line of the multi-line comment section.
+
+Although, avoid using comments for obvious and clear parts of your code. Having too many comments actually reduces your code's readability.
+
+Add comments to parameter files:
+Parameter files enable you to create a JSON file to specify a set of parameter values for your deployment.
+
+IMPORTANT: When you work with parameter files and other JSON files that include comments, you usually need to use the .jsonc file extension instead of .json.
+This helps VS Code and other tools understand that comments are allowed.
+
+Also in your Bicep templates you can use the '@description()' decorator to explain the purpose of params and vars.
+
+You can also use this previus description approach within resources, adding the 'description' keyword and its value (description: 'description here.') property in the properties of a resource.
+
+
+Apply resource tags:
+Comments in your Bicep fiel don't appear anywhere in your deployed resources in the Azure Portal, although, tags associated with the resources does.
+
+
 
 
