@@ -5,7 +5,6 @@ variables:
   resourceGroupName: 'myResourceGroupName'
   location: 'myResourceGroupLocation'
   templateFile: 'main.bicep'
-  parametersFile: 'parameters.bicepparam'
 
 steps:
   - task: AzureCLI@2
