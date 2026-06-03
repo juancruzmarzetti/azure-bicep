@@ -1,0 +1,128 @@
+---------- Preview Azure deployment changes by using what-if ----------
+
+- Describe the two deployment modes in Azure and their effects.
+- Preview what changes will happen before by using the what-if operatin.
+
+The use case for the what-if preview functionality is very useful for those cases in which we have already deployed resources in our Azure Portal and we are changing the existent resource group,
+the 'What-if' tells us what will change on our already existent Azure resource group if we actually deploy our changes to ARM.
+
+Basically it's functionality that provides a preview of the changes that will be done (WHAT will change in our environment IF we deploy our changes).
+
+
+Understand deployment modes:
+- Incremental: default mode.
+- Complete: non-default mode.
+
+Example scenario 1 of incremental mode:
+If we already have a WebApplication and a StorageAccount in our environment and in our template that we will deploy we change things of the WebApp and the StorageAccount and create a second new WebApp,
+this deploy will trigger updates to the existent WebApp and the exitent StorageAccount and will also create a second WebApp.
+
+Example scenario 2 of incremental mode:
+In this scenario we have already deployed in our environment 2 WebApps and a Storage Account, and in our bicep template we change things of one WebApp and the StorageAccount.
+(this is the huge difference between Incremental and complete deployment modes are.). 
+In this case if we actually deploy our bicep template to the ARM environment in incremental deployment mode, it will trigger updates to the one WebApp that we changed in our template and the StorageAccount as well,
+and it will do nothing about the second WebApp that is already deployed in our environment.
+
+Example scenario 1 of complete mode:
+We already have a WebApp and a StorageAccount in our environment, and we change things of those resources and also create a second new WebApp in our template.
+The result of the deployment will be the same as in the example scenario 1 of the incremental mode.
+
+Example scenario 2 of complete mode:
+In this scenario we have already deployed in our environment 2 WebApps and a Storage Account, and in our bicep template we change things of one WebApp and the StorageAccount. 
+(same scenario as example scenario 2 of incremental mode). 
+In that case if we deploy our template in complete deployment mode, it will actually delete the second WebApp that we are not changing and was already existing in our environment.
+
+Based on this behaviours the incremental default deployment mode it's the least risky deployment mode.
+
+Incremental:
+- Default.
+- Template is not the source of truth.
+- Use when you have multiple templates within the same resource group.
+- Available on resource group. subscription, management group and tenant scope.
+
+Complete:
+- Need to indicate this mode explicitly (non-default).
+- Template is the source of truth.
+- Use when the template is your only way of deployment.
+- Only available on resource group scope.
+
+
+Deployment Stacks:
+- Can think of it like 'Complete Mode v2'.
+- Template is the soure of truth.
+- Stacks will help you manage the full lifecycle of *all* resources defined in the template/bicep, regardless of scope (Template defines a 'virtual boundary' of managed resources).
+- Now in Private Preview (email bmoore@microsoft.com to sign up).
+(This deployment mode is like a safe complete deployment mode, in which you can decide for each case when you want to delete a specific resource that is not in your template or leave it where it was).
+(You can deploy to a specific scope with stacks or you can deploy to several scopes, and you can prevent de default deletion of resources that are risky deploying templates in complete mode).
+
+
+Predict what a deployment will do by using what-if and confirm before the deploy:
+
+az deployment group create -f .\main.bicep -g resourceGroupName --confirm-with-what-if
+
+('-f' referrs to '--template-file').
+('-g' referrs to '--resource-group').
+(for this command to execute correctrly, the recource group 'recourceGroupName' has to be already existing in our environment and we have to already setted our Azure credentials in this session).
+
+The 'what-if' is very similar to the 'terraform plan' functionality using terraform.
+This --confirm-with-what-if will, show us in terminal, the properties of the resources that are going to change if we actually deploy the template.
+
+But it's a more detailed functionality, that can show us, using the '--what-if-result-format' flag, the properties that we believe important, in that following case below, attach to this flag the 'ResourceIdOnly' instruction,
+which indicates to the 'what-if' functionality that we only want to see the Ids of the resources that are going or not to change. In this case it will refer with '!' to the ones who are going to change and with '*' 
+to the other ones which are going to be ignored after the deployment.
+
+az deployment group create -f .\main.bicep -g resourceGroupName --confirm-with-what-if --what-if-result-format ResourceIdOnly
+
+output example:
+
+! Microsoft.Storage/storageAccounts/storageAccountId
+* Microsoft.Cache/Redis/RedisId
+
+
+Control the formats of wath-if results:
+
+The New-AzResource*Deployment -WhatIf Azure Powershell cmdlet or az deployment * create --what-if create a new deployment to a resource group.
+- FullResourcePayloads: (default whatif format) by including this parameter, you get a verbose output that consists of a list of resources that will change. The output also shows details about all the properties that
+will change in accordance with the template.
+- ResourceIdOnly: this mode returns a list of resources that will change, but not all the details.
+
+example of FullResourcePayloads what if formatting:
+
+az deployment group create -f .\main.bicep -g resourceGroupName --confirm-with-what-if --what-if-result-format FullResourcePayloads
+(the FullResourcePayloads whatIf format is the default format, so it's not really neccessary to be explicitly assigned in the Azure CLI command).
+
+Type of changes that WhatIf detects:
+
+- Create   --> The resource doesn't currently exist but is defined in the template --> The resource will be deployed.
+- Delete   --> This change type applies only when you're using complete mode for deployment. The resource exists but isn't defined in the template --> The resource will de deleted.
+- Ignore   --> The resource exists but isn't defined in the template (incremental mode) --> The resource won't be deployed or modified it will de totally ignored.
+- NoChange --> The resource exists and it's defined in the template --> The resource will be redeployed, but its properties won't change. This change type
+									is returned when the result format is FullResourcePayloads, which is the default result format.
+- Modify   --> The resource exists, is defined in the template, and the properties will change --> The resource will be redeployed, and the properties will change. This change
+												   type is returned when the result format is set to FullResourcePayloads (default result format).
+- Deploy   --> The resource exists and is defined in the template --> The resource will be redeployed. The properties of the resource might or not change. The operation returns this change
+								      type when it doesn't have enough information to determine if any properties will change. You see this condition
+								      only when the result format is set to ResourceIdOnly (non-default result format).
+
+So the huge difference between incremental and complete deployment mode is the following below:
+The resource exists but isn't defined in the template --> incremental mode: ignores it --> complete mode: deletes it
+
+
+Use what-if results in a script:
+You might want to use the output fromt the what-if operatin within a script or as part of an automated deployment process.
+
+--no-pretty-print --> raw JSON
+(view example at exercises/class_9/jsonWhatIfOutputAnalyzeExample)
+
+
+The complete deployment mode is referred on Azure CLI using '--mode Complete'
+Also we can set the '--confirm-with-what-if' with the '-c' shortcut using Azure CLI.
+(view example at exercises/class_9/whatIfCompleteModeExample)
+
+
+What-if noise:
+The what-if operation sometimes shows that a resource will change when actually no change will happen (false positives). 
+The Microsoft Azure Team is working to reduce these problems (Please reports this what-if noise problems to https://aka.ms/whatifissues). 
+You can also, in that case, create an issue on the following github repository: https://github.com/Azure/arm-template-whatif
+
+
