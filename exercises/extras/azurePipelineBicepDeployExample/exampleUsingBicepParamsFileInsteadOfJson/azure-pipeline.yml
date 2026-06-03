@@ -1,0 +1,26 @@
+trigger:
+  - main
+
+variables:
+  resourceGroupName: 'myResourceGroupName'
+  location: 'myResourceGroupLocation'
+  templateFile: 'main.bicep'
+  parametersFile: 'parameters.bicepparam'
+
+steps:
+  - task: AzureCLI@2
+    displayName: 'Desplegar infraestructura con Bicep'
+    inputs:
+      azureSubscription: 'NombreDeTuServiceConnection' # Reemplaza con tu conexión a Azure
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        az --version
+        
+        echo "Creando grupo de recursos..."
+        az group create --name $(resourceGroupName) --location $(location)
+        
+        echo "Desplegando plantilla Bicep..."
+        az deployment group create \
+        --resource-group $(resourceGroupName) \
+        --parameters parameters.bicepparam
