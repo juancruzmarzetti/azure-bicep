@@ -2,7 +2,7 @@
 
 RESOURCE_GROUP="myResourceGroupName"
 # LOCATION="eastus" --> Not necessary if the resource group already exists
-TEMPLATE_FILE=".\main.bicep"
+TEMPLATE_FILE="./main.bicep"
 
 # echo "Logging on Azure..."
 # az login
