@@ -1,0 +1,28 @@
+-------- Extend ARM templates by using deployment scripts ---------
+
+Deployment scripts in Azure Resource Manager templates (ARM templates) and Bicep enable custom automation for your environment management.
+
+Example scenario: 
+Suppose you're a member of a cross-functional team that supports an application.
+
+¿How to add custom heaviour to your Bicep or JSON ARM templates by using deployment scripts?
+
+deploymentScripts resource can extend your templates:
+deploymentScripts resources are either PowerShell or Bash scripts that run in a Docker container as part of your template deployment. The way it starts up, the're set to log in with a manged identity, 
+so you assign a managed identity to the container instance that's gonna run the deploymentScripts, and you can pre-create that managed identity from the Portal, and becuase you're creating that managed identity you get to control
+what your deploymentScript has access to make changes to (roleAssignments). Once with that identity, we can run our script.
+
+
+Deployment script structure:
+To add a custom behaviour to a template, you start with the deploymentScripts resource.
+- A name for the deploymentScripts resource.
+- The type and apiVersion values.
+- The location value (where the supportin resources will be created).
+- Ann empty properties object.
+- kind: The type of script to run (AzurePowerShell or AzureCLI).
+- identity: The managed identity that the container instance will use. You can create the managed identity ahead of time and specify it like the following example. Or you can create it in the template and reference it there.
+
+Include script files:
+Embedding scripts inline in templates can be cumbersome, hard to read and understand, and difficult to change.
+
+
