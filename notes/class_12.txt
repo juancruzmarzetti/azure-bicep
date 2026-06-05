@@ -1,0 +1,298 @@
+---------- Deploy resources to subscriptions, management groups and tenants by using Bicep -----------
+
+Some Azure resources are deployed outside resoirce group.
+The're instead deployed at various scopes:
+- A subscription.
+- A management group.
+- Or even your whole tenant.
+
+Exanple scenario:
+Suppose you're responsible for deploying and configuring Azure infrastructure at a toy company.
+In Project Teddybear subscription, you have a Virtual network in to a resource group, and a Policy resource outside the resource group and into the subscription.
+
+Our bicep template can be deployed to various scopes:
+- Set the scope of a Bicep file by using the targetScope keyword.
+- Use modules and the scope keyword to deploy your resources to various scopes within a single deployment.
+- Target specific scopes by using the resourceGroup(), subscription(), managementGroup(), and tenant() functions.
+
+The Azure resource hierarchy:
+Azure has a hierarchical resource structure with multiple levels of managements.
+
+				     [ Tenant ]
+                          		  │
+             		      [ Root management group ]
+                          ┌───────────────┴───────────────┐
+                          ▼                               ▼
+                    [ Production ]                [ Non-production ]
+             ┌────────────┴────────────┐                  │
+             ▼                         ▼                  ▼
+       ( Marketing )              ( Products )     ( Project Teddybear )
+       ┌─────┴─────┐                   │                  │
+       ▼           ▼                   ▼                  ▼
+  [ Launch-1 ] [ Launch-2 ]      [ Product-A ]      [ Networking ]
+
+
+
+You might consider implementing a lading zone:
+
+						 [ Tenant ]
+                                		      │
+                         		 [ Root management group ]
+                                      		      │
+                     		      [ Toy Company management group ]
+                                      ┌───────────────┴───────────────┐
+                                      ▼                               ▼
+                          [ PlatformManagement ]          [ Application Landing Zones ]
+                           ┌──────────┴──────────┐                 ┌──────────┴──────────┐
+                           ▼                     ▼                 ▼                     ▼
+                     ( Management )       ( Connectivity )  ( Project Teddybear ) ( Project Jigsaw )
+
+
+
+Subscription-scoped resources:
+You might deploy resources to a subscrition when:
+- Create a resource group.
+- Grant access to all resources in a subscription.
+- Apply policy to all resources in a subscription.
+
+Mangagement group-scoped resources:
+You might deploy resources to a management group when:
+- Grant access to all resources in a set of subscriptions.
+- Apply policy to all resources in your organization.
+IMPORTANT: Be extremely careful when you grant access to resources by using management groups, and specially the root management group.
+(because permissions are inherited though the entire hierarchy, so if you do grant access to somebody to the root management group scope that is a very powerful set of permissions. It's important to be careful because
+you shouldn't grant unnecesary permissions).
+
+Tenant-scoped resources:
+You might deploy resources to your tenant when:
+- Create a subscription.
+- Create or configure management groups.
+Tip: Tenant-scoped deployments require special permission.
+In practice, you don't need to submit tenant-scoped deployments. It's simpler to instead deploy tenant-scoped resources by using a template at a different scope.
+
+
+Resource IDs:
+A resource ID can be seen as something like this: /subscriptions/asdadasd-asd76-asd76-as9d8-asd9sada9sd/resourceGroups/ToyDevelopment
+which means: /subscriptions/<subscriptionId>/resourceGroups/<resourcegroupName>
+which also reflects the following hierarchy: subscription --> resourceGroup
+
+So a subscription have its own Id. In this example: 'asdadasd-asd76-asd76-as9d8-asd9sada9sd'
+
+Note: Although subscriptions are considered children of management groups, their resource IDs don't include a management group ID.
+The relationship between subscriptions and management groups is tracked by Azure in a way that's different from other resource relationships.
+This gives you the flexibility to move subscriptions between management groups without having to change all the resource IDs.
+(Because of this you deploy them at a tenant level and not on a management group level).
+
+Here's an example of a mangement group ID: /providers/Microsoft.Management/managementGroups/ProductionMG
+It's ensambled like this: /providers/<Provider>/managementGroups/<managementGroupName>
+
+Note: Managment groups have both an identifier and a display name.
+The display name is a human-readable description of the management group. You can change the display name without affecting the management group's ID.
+
+Here's an example resource ID for a role definition that has been created at a management group scope:
+/providers/Microsoft.Management/managementGroups/ProductionMG/providers/Microsoft.Authorization/roleDefinitions/das32d4asd35-a5d4-gd87-as87-a8s7d6a7d6a7
+which can be decompressed like this: providers/<managementGroupProvider>/managementGroups/<managementGroupName>/providers/<resourceProvider>/<resource>/<subscriptionID>  
+
+
+Deploy resources to different scopes:
+Specify the target scope to a Biceo file:
+Bicep needs to know the scope at which a file will be deployed.
+
+By default the target scope is 'resorceGroup'.
+but you also can set this value to 'subscription', 'managementGroup' or 'tenant'.
+When you deploy a bicep file to a managementGroup, you don't necessarely have to specify bicep to which managementGroup (before deploying it), during the deploy Bicep will
+ask to you to which managementGroup you want to deploy it and then you specify it.
+
+Example of bicep template: 
+
+targetScope = 'subscription'
+
+resource resourceGroup 'Microrosft.Resources/resourceGroups@2021-01-01' = {
+	name: 'example-resource-group'
+	location: 'westus'
+}
+
+
+Submit a deployment:
+When you initiate a deployment, you need to tell Azure which scope you want to deploy it at.
+- Resource group scope ----> az deployment group cerate...
+- Subscription scope ------> az deployment sub create...
+- Management group scope --> az deployment mg create...
+- Tenant scope ------------> az deployment tenant create...
+
+When we deploy on a subscription scope we need to specify the location in the deploy command lines, because subscriptions don't have a specific location.
+We can reference the location using '--location':
+
+for example: '--location westus' 
+
+When you delete a resource group, all the resources within that resource group are deleted,
+but when we start working with subscriptions and management groups and tenants, if we create resources to test with, we have to make sure
+we have to make sure to delete them all one by one. When you deploy to test in subscritptions, management groups and tenant scopes is a very good practice to immediately delete the test resources.
+
+
+Deploy reosurces to multiple scopes:
+Sometimes you need to deploy resources across multiple levels of your hierarchy form within one deployment.
+- Two differente resource groups.
+- Both the resource group and the resources within it.
+- Both management groups and suscriptions.
+
+Specify the scope for a module:
+You can use Bicep modules to deploy a set of resources at a scope that's different fro the targetScope specified in the main file:
+Example below:
+
+targetScope= 'subscription'
+
+module networkModule 'modules/network.bicep' = {
+	scope: resourceGroup('ToyNetworking')
+	name: 'networkModule'
+}
+
+
+Deploy across multiple resource groups:
+A common use of scopes is to deploy resources across multiple resource groups.
+Example below:
+
+module networkModule 'modules/network.bicep' = {
+	scope: resourceGroup('ToyNetworking')
+	name: 'networkModule'
+}
+
+resource networkInterface 'Microsoft.Network/networkInterface@2020-11-01' = {
+	name: 'production.nic'
+	location: resourceGroup().location
+	properies: {
+		ipConfigurations: [
+			{
+				name: 'toy-subnet-ip-configuration'
+				properties: {
+					subnet: {
+						id: networkModule.outputs.subnetResourceId
+					}
+				}
+			}
+		]
+	}
+}
+
+Then this bicep template would be deployed, for example, to the ProjectTeddybear resource group.
+Example: az deplyment group create -g ProjectTeddyBear ...
+
+
+You can even deploy a resource group in another sibscription by including the subscription ID in the resourceGroup scope:
+Example below:
+
+module networkModule 'modules/network.bicep' = {
+	scope: resourceGroup('asdas65das6-as76-5as5-s78s-65f6asd5f', 'Toynetworking')
+	name: 'networkModule'
+}
+
+
+Specify the scope for a single resource:
+The scope keyword can be used on a few other specific resource types not just modules, including:
+- Extension resources
+- Tenant-scoped resources
+Example:
+
+targetScope = 'managementGroup'
+
+resource parentManagementGroup '...' = {
+	scope: tenant()
+	name: 'NonProduction'
+	properties: {
+		displayName: 'Non-production'
+	}
+}
+
+resource childManagementGroup '...' = {
+	scope: tenant()
+	name: 'SecretRND'
+	properties: {
+		displayName 'Secret R&D Projects'
+		details: {
+			parent: {
+				id: parentManagementGroup.id
+			}
+		}
+	}
+}
+
+
+Create a management group and subscription hierarchy:
+Example:
+
+resource subscription 'Microsoft.Subscription/aliases@2020-09-01' = {
+	scope: tenant()
+	name: subscriptionAliasName
+	properties: {
+		// there we can set other properties like a billing scope and more others...
+	}
+}
+
+You can then associate the subscription with a management group, which requires you deploy a resource type called 'Microsoft.Management/managementGroups/subscriptions'.
+Because this is a tenant-scoped resource, you usually declare it in a module.
+This resource type basically says to ARM that this managementGroup (a specific one) should have this subscription inside it.
+
+Example: 'modules/mg-subscription-association.bicep'
+
+targetScope = 'tenant'
+
+@description('The name of the management group that should conatin the subscription.')
+param managementGroupName string
+
+@description('The subscription ID to place into the management group.')
+param subscriptionID string
+
+resource managementGroup 'Microsoft.Management/managementGroups@2021-04-01' existing = {
+	name: managementGroupName
+} 
+
+resource subscriptionAssociation 'Microsoft.Management/managementGroups/subscription@2021-04-01' = {
+	parent: managementGroup
+	name: subscriptionId
+}
+
+other file below: 'main.bicep':
+
+targetScope = 'managementGroup'
+
+resource parentManagementGroup 'Microsoft.Management/managementGroups@2020-05-01' = {
+	scope: tenant()
+	name: 'Non-production'
+	properties: {
+		displayName: 'Non-production'
+	}
+}
+
+resource childManagementGroup 'Microsoft.Management/managementGroups@2020-05-01' = {
+	scope: tenant()
+	name: 'SecretRND'
+	properties: {
+		displayName: 'Secret R&D Projects'
+		details: {
+			parent: {
+				id: parentManagementGroup.id
+			}
+		}
+	}
+}
+
+resource sunscription 'Microsoft.Subscription/aliases@2020-09-01' = {
+	scope: tenant()
+	name: subscriptionAliasName
+	properties: {
+		// ...
+	}
+}
+
+module subscriptionAssociation 'modules/mg-subscription-association.bidep' = {
+	name: 'subscriptionAssociation'
+	scope: tenant()
+	params: {
+		managementGroupName: childManagementGroup.name
+		sobscriptionId: subscription.properties.subscriptionId
+	}
+}
+
+So, what we are doing here is defining a parent management group, a child management group and a subscription, and then linking that subscription into that managementGroup hierarchy.
+
+ 
