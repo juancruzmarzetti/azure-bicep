@@ -26,3 +26,9 @@ Include script files:
 Embedding scripts inline in templates can be cumbersome, hard to read and understand, and difficult to change.
 
 
+Parameterize deployment scripts:
+- Using command-line arguments: the first option for passing data into the deploymentScripts resources is to customize the arguments property.
+(Some parsing happens, so test some variations of your arguments property. It'll be broken up into an array of strings the same way that the Windows shell parses command lines.).
+- Using environment variables: your second option is to create environment variables that your scripts can access.
+
+
